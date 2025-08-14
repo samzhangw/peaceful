@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>自訂大小棋盤 + 四面積木暫置區（單積木單面盤上，可移除積木、匯出PNG）</title>
+<title>自訂大小棋盤 + 四面積木暫置區（單積木單面盤上，可移除積木、旋轉、匯出PNG）</title>
 <style>
   :root{ --cell-cm:2.5cm; }
   body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Noto Sans TC, sans-serif; display: flex; gap: 20px; padding:16px; }
@@ -40,7 +40,7 @@
     </div>
 
     <div id="sidebars"></div>
-    <div class="meta">說明：盤上積木可旋轉，每個積木同時僅能有一個面在盤上，可右鍵移除積木，匯出 PNG。</div>
+    <div class="meta">說明：盤上積木可旋轉（雙擊旋轉），每個積木同時僅能有一個面在盤上，可右鍵移除積木，匯出 PNG。</div>
   </div>
 
   <div id="board-wrap">
@@ -123,6 +123,7 @@ function createBoardPiece(facesArray,w,h,initCol=0,initRow=0,pieceIndex=0,faceUr
     offsetX=e.clientX-rect.left; offsetY=e.clientY-rect.top; dragging=true; dragFromSidebar=false;
   });
 
+  el.addEventListener('dblclick',()=>rotatePiece(el,90));
   el.addEventListener('contextmenu',e=>{ e.preventDefault(); removeBoardPiece(el); });
   return el;
 }
@@ -162,12 +163,9 @@ function snapToGrid(piece){
   let col=Math.round(x/cellW); let row=Math.round(y/cellH);
   col=Math.max(0, Math.min(COLS-1, col)); row=Math.max(0, Math.min(ROWS-1, row));
   piece.style.left=(col*cellW)+'px'; piece.style.top=(row*cellH)+'px';
-  updateFaceIndicator(piece);
 }
 
 function rotatePiece(piece,angle=90){ piece.dataset.rotation=(parseInt(piece.dataset.rotation||'0')+angle)%360; piece.style.transform=`rotate(${piece.dataset.rotation}deg)`; snapToGrid(piece); }
-function updateFaceIndicator(piece){ const indicator=piece.querySelector('.face-indicator'); if(indicator) indicator.textContent='1/1'; }
-board.addEventListener('mousedown',e=>{if(e.target===board) selectedPiece=null;});
 
 exportPNGBtn.addEventListener('click',()=>{
   html2canvas(board).then(canvas=>{
@@ -181,7 +179,7 @@ exportPNGBtn.addEventListener('click',()=>{
 // 載入 html2canvas
 const script=document.createElement('script'); script.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'; document.body.appendChild(script);
 
-board.innerHTML='<div style="position:absolute;left:8px;top:8px;color:#5b6b83;font-size:13px">從每個積木暫置區拖到盤上，每個積木同時僅能有一個面在盤上，右鍵移除積木，可匯出 PNG。</div>';
+board.innerHTML='<div style="position:absolute;left:8px;top:8px;color:#5b6b83;font-size:13px">從每個積木暫置區拖到盤上，每個積木同時僅能有一個面在盤上，雙擊旋轉，右鍵移除積木，可匯出 PNG。</div>';
 </script>
 </body>
 </html>
