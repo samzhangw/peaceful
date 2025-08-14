@@ -28,6 +28,16 @@
   .meta { font-size:12px; color:#5b6b83; margin-top:8px; }
   .face-indicator { position:absolute; right:6px; top:6px; background:rgba(0,0,0,0.5); color:#fff; padding:2px 6px;border-radius:6px;font-size:12px; }
   .board-size-input { width:50px; padding:4px; border-radius:4px; border:1px solid #c8d3e6; }
+  
+  /* 列印樣式：只印出棋盤 */
+  @media print {
+    @page { margin: 10mm; }
+    body { display:block; padding:0; }
+    #left, .controls, .meta, .sidebar-container { display:none !important; }
+    #board-wrap { padding:0 !important; background:#fff !important; }
+    #board { box-shadow:none !important; border-color:#c8d3e6; }
+    .face-indicator { display:none !important; }
+  }
 </style>
 </head>
 <body>
@@ -36,7 +46,7 @@
       <div>行：<input id="rowsInput" type="number" class="board-size-input" value="4" min="1"></div>
       <div>列：<input id="colsInput" type="number" class="board-size-input" value="8" min="1"></div>
       <button id="resizeBoard" class="btn small">更新棋盤大小</button>
-      <button id="exportPNG" class="btn small">匯出 PNG</button>
+      <button id="printBoard" class="btn small">列印</button>
     </div>
 
     <div id="sidebars"></div>
@@ -54,7 +64,7 @@ const sidebarsContainer=document.getElementById('sidebars');
 const rowsInput=document.getElementById('rowsInput');
 const colsInput=document.getElementById('colsInput');
 const resizeBoardBtn=document.getElementById('resizeBoard');
-const exportPNGBtn=document.getElementById('exportPNG');
+const printBtn=document.getElementById('printBoard');
 let selectedPiece=null, dragging=false, dragFromSidebar=false;
 let offsetX=0, offsetY=0;
 let activePiecesOnBoard = new Map();
@@ -177,19 +187,11 @@ function rotatePiece(piece,angle=90){
   snapToGrid(piece);
 }
 
-exportPNGBtn.addEventListener('click',()=>{
-  html2canvas(board).then(canvas=>{
-    const link=document.createElement('a');
-    link.download='board.png';
-    link.href=canvas.toDataURL();
-    link.click();
-  });
-});
+printBtn.addEventListener('click',()=>{ window.print(); });
 
-// 載入 html2canvas
-const script=document.createElement('script'); script.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'; document.body.appendChild(script);
+// 列印不需外部函式庫
 
-board.innerHTML='<div style="position:absolute;left:8px;top:8px;color:#5b6b83;font-size:13px">從每個積木暫置區拖到盤上，每個積木同時僅能有一個面在盤上，雙擊旋轉，右鍵移除積木，可匯出 PNG。</div>';
+board.innerHTML='<div style="position:absolute;left:8px;top:8px;color:#5b6b83;font-size:13px">從每個積木暫置區拖到盤上，每個積木同時僅能有一個面在盤上，雙擊旋轉，右鍵移除積木，按下「列印」可直接列印棋盤。</div>';
 </script>
 </body>
 </html>
