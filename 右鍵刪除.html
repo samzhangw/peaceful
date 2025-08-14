@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>自訂大小棋盤 + 四面積木暫置區（單積木單面盤上，可移除積木）</title>
+<style>
+  :root{ --cell-cm:2.5cm; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Noto Sans TC, sans-serif; display: flex; gap: 20px; padding:16px; }
+  #left { width: 280px; }
+  .sidebar-container { margin-bottom:12px; }
+  .sidebar-title { font-weight:bold; margin-bottom:4px; }
+  .sidebar { width: 100%; border: 2px solid #d0d7e6; padding: 8px; display: flex; flex-wrap: wrap; gap: 8px; min-height: 80px; background:#fff; border-radius:8px; }
+  #board-wrap { background: #f6f7fb; padding: 12px; border-radius: 12px; flex:1; }
+  #board {
+    position: relative;
+    background-image: linear-gradient(to right, #e7ecf5 1px, transparent 1px),
+                      linear-gradient(to bottom, #e7ecf5 1px, transparent 1px);
+    border: 2px solid #d7deea;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(18,35,62,.06);
+  }
+  .piece, .piece-sidebar { position: relative; display:block; cursor: grab; user-select: none; transform-origin: top left; border-radius: 6px; overflow: hidden; }
+  .piece { position: absolute; }
+  .piece img, .piece-sidebar img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events:none; }
+  .controls { margin-bottom:8px; display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+  .btn { padding:8px 10px; border-radius:8px; border:1px solid #c8d3e6; background:#fff; cursor:pointer; }
+  .small { padding:6px 8px; font-size:13px; }
+  .meta { font-size:12px; color:#5b6b83; margin-top:8px; }
+  .face-indicator { position:absolute; right:6px; top:6px; background:rgba(0,0,0,0.5); color:#fff; padding:2px 6px;border-radius:6px;font-size:12px; }
+  .board-size-input { width:50px; padding:4px; border-radius:4px; border:1px solid #c8d3e6; }
+</style>
+</head>
+<body>
+  <div id="left">
+    <div class="controls">
+      <div>行：<input id="rowsInput" type="number" class="board-size-input" value="4" min="1"></div>
+      <div>列：<input id="colsInput" type="number" class="board-size-input" value="8" min="1"></div>
+      <button id="resizeBoard" class="btn small">更新棋盤大小</button>
+    </div>
+
+    <div id="sidebars"></div>
+    <div class="meta">說明：盤上積木可旋轉，每個積木同時僅能有一個面在盤上，可右鍵移除積木。</div>
+  </div>
+
+  <div id="board-wrap">
+    <div id="board"></div>
+  </div>
+
+<script>
+let COLS=8, ROWS=4, PIECES=10;
+const board=document.getElementById('board');
+const sidebarsContainer=document.getElementById('sidebars');
+const rowsInput=document.getElementById('rowsInput');
+const colsInput=document.getElementById('colsInput');
+const resizeBoardBtn=document.getElementById('resizeBoard');
+let selectedPiece=null, dragging=false, dragFromSidebar=false;
+let offsetX=0, offsetY=0;
+let activePiecesOnBoard = new Map(); // key: pieceIndex, value: true if any face is on board
+
+function updateBoardSize(){
+  ROWS=parseInt(rowsInput.value)||4;
+  COLS=parseInt(colsInput.value)||8;
+  board.style.width=`calc(var(--cell-cm) * ${COLS})`;
+  board.style.height=`calc(var(--cell-cm) * ${ROWS})`;
+  board.style.backgroundSize=`calc(var(--cell-cm)) calc(var(--cell-cm))`;
+  board.querySelectorAll('.piece').forEach(p=>snapToGrid(p));
+}
+resizeBoardBtn.addEventListener('click',updateBoardSize);
+
+function createSidebar(pieceIndex){
+  const container=document.createElement('div'); container.className='sidebar-container';
+  const title=document.createElement('div'); title.className='sidebar-title'; title.textContent=`積木 ${pieceIndex+1}`; container.appendChild(title);
+  const sidebar=document.createElement('div'); sidebar.className='sidebar'; container.appendChild(sidebar);
+
+  const fileInput=document.createElement('input');
+  fileInput.type='file'; fileInput.accept='image/*'; fileInput.multiple=true; fileInput.hidden=true;
+  fileInput.addEventListener('change',e=>{
+    const files=Array.from(fileInput.files).slice(0,4);
+    sidebar.innerHTML='';
+    files.forEach(f=>{
+      const url=URL.createObjectURL(f);
+      const img=new Image(); img.src=url;
+      img.onload=()=>{ 
+        const thumb=document.createElement('div'); thumb.className='piece-sidebar';
+        thumb.style.width=img.naturalWidth+'px'; thumb.style.height=img.naturalHeight+'px';
+        thumb.dataset.faces=JSON.stringify([url]); thumb.dataset.faceIndex='0'; thumb.dataset.w=img.naturalWidth; thumb.dataset.h=img.naturalHeight; thumb.dataset.rotation='0';
+        thumb.dataset.pieceIndex = pieceIndex;
+        thumb.dataset.faceUrl = url;
+        thumb.appendChild(img);
+        thumb.addEventListener('mousedown',ev=>{
+          if(activePiecesOnBoard.get(pieceIndex)) return; // 已有任一面在盤上，阻止拖入
+          selectedPiece=thumb; dragFromSidebar=true; offsetX=ev.offsetX; offsetY=ev.offsetY;
+        });
+        sidebar.appendChild(thumb);
+      };
+    });
+  });
+
+  const uploadBtn=document.createElement('button'); uploadBtn.textContent='上傳'; uploadBtn.className='btn small';
+  uploadBtn.addEventListener('click',()=>fileInput.click());
+  container.appendChild(uploadBtn); container.appendChild(fileInput);
+  sidebarsContainer.appendChild(container);
+}
+
+for(let i=0;i<PIECES;i++) createSidebar(i);
+
+function createBoardPiece(facesArray,w,h,initCol=0,initRow=0,pieceIndex=0,faceUrl=''){
+  if(activePiecesOnBoard.get(pieceIndex)) return null; // 同積木已有面在盤上
+  activePiecesOnBoard.set(pieceIndex, true);
+  const el=document.createElement('div'); el.className='piece';
+  el.style.width=w+'px'; el.style.height=h+'px';
+  el.dataset.w=w; el.dataset.h=h; el.dataset.rotation='0';
+  el.dataset.faces=JSON.stringify(facesArray); el.dataset.faceIndex='0';
+  el.dataset.faceUrl = faceUrl; el.dataset.pieceIndex = pieceIndex;
+  const img=document.createElement('img'); img.src=facesArray[0]; el.appendChild(img);
+  const indicator=document.createElement('div'); indicator.className='face-indicator'; indicator.textContent='1/1'; el.appendChild(indicator);
+  board.appendChild(el);
+  snapToGrid(el,initCol,initRow);
+
+  el.addEventListener('mousedown',e=>{
+    e.stopPropagation(); selectedPiece=el; el.style.zIndex=999;
+    const rect=el.getBoundingClientRect();
+    offsetX=e.clientX-rect.left; offsetY=e.clientY-rect.top; dragging=true; dragFromSidebar=false;
+  });
+
+  el.addEventListener('contextmenu',e=>{
+    e.preventDefault();
+    removeBoardPiece(el);
+  });
+
+  return el;
+}
+
+function removeBoardPiece(piece){
+  const pieceIndex = parseInt(piece.dataset.pieceIndex);
+  activePiecesOnBoard.delete(pieceIndex);
+  piece.remove();
+}
+
+window.addEventListener('mousemove',e=>{
+  if(!selectedPiece) return;
+  if(dragFromSidebar && selectedPiece.classList.contains('piece-sidebar')){
+    const faces=JSON.parse(selectedPiece.dataset.faces||'[]');
+    const w=parseInt(selectedPiece.dataset.w), h=parseInt(selectedPiece.dataset.h);
+    const pieceIndex = parseInt(selectedPiece.dataset.pieceIndex);
+    selectedPiece=createBoardPiece(faces,w,h,0,0,pieceIndex,selectedPiece.dataset.faceUrl);
+    dragFromSidebar=false; dragging=true;
+  }
+  if(dragging && selectedPiece && selectedPiece.classList.contains('piece')){
+    const br=board.getBoundingClientRect();
+    selectedPiece.style.left=(e.clientX-br.left-offsetX)+'px';
+    selectedPiece.style.top=(e.clientY-br.top-offsetY)+'px';
+  }
+});
+
+window.addEventListener('mouseup',e=>{
+  if(!selectedPiece) return;
+  if(dragging && selectedPiece.classList.contains('piece')) snapToGrid(selectedPiece);
+  dragging=false; dragFromSidebar=false;
+  if(selectedPiece && selectedPiece.classList.contains('piece')) selectedPiece.style.zIndex='';
+});
+
+function snapToGrid(piece){
+  const cellW=board.clientWidth/COLS, cellH=board.clientHeight/ROWS;
+  let x=parseFloat(piece.style.left)||0, y=parseFloat(piece.style.top)||0;
+  let col=Math.round(x/cellW); let row=Math.round(y/cellH);
+  col=Math.max(0, Math.min(COLS-1, col)); row=Math.max(0, Math.min(ROWS-1, row));
+  piece.style.left=(col*cellW)+'px'; piece.style.top=(row*cellH)+'px';
+  updateFaceIndicator(piece);
+}
+
+function rotatePiece(piece,angle=90){
+  piece.dataset.rotation=(parseInt(piece.dataset.rotation||'0')+angle)%360;
+  piece.style.transform=`rotate(${piece.dataset.rotation}deg)`;
+  snapToGrid(piece);
+}
+
+function updateFaceIndicator(piece){ const indicator=piece.querySelector('.face-indicator'); if(indicator) indicator.textContent='1/1'; }
+
+board.addEventListener('mousedown',e=>{if(e.target===board) selectedPiece=null;});
+
+board.innerHTML='<div style="position:absolute;left:8px;top:8px;color:#5b6b83;font-size:13px">從每個積木暫置區拖到盤上，每個積木同時僅能有一個面在盤上，右鍵移除積木。</div>';
+</script>
+</body>
+</html>

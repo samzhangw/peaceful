@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>自訂大小棋盤 + 吸附方格（二維格子追蹤積木）</title>
+<style>
+  :root{ --cell-cm:2.5cm; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Noto Sans TC, sans-serif; display: flex; gap: 20px; padding:16px; }
+  #left { width: 240px; }
+  #sidebar { width: 100%; border: 2px solid #d0d7e6; padding: 8px; display: flex; flex-wrap: wrap; gap: 8px; min-height: 320px; background:#fff; border-radius:8px; }
+  #board-wrap { background: #f6f7fb; padding: 12px; border-radius: 12px; }
+  #board {
+    position: relative;
+    background-image: linear-gradient(to right, #e7ecf5 1px, transparent 1px),
+                      linear-gradient(to bottom, #e7ecf5 1px, transparent 1px);
+    border: 2px solid #d7deea;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(18,35,62,.06);
+  }
+  .piece, .piece-sidebar { position: relative; display:block; cursor: grab; user-select: none; transform-origin: top left; border-radius: 6px; overflow: hidden; }
+  .piece { position: absolute; }
+  .piece img, .piece-sidebar img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events:none; }
+  .controls { margin-bottom:8px; display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+  .btn { padding:8px 10px; border-radius:8px; border:1px solid #c8d3e6; background:#fff; cursor:pointer; }
+  .small { padding:6px 8px; font-size:13px; }
+  .meta { font-size:12px; color:#5b6b83; margin-top:8px; }
+  .face-indicator { position:absolute; right:6px; top:6px; background:rgba(0,0,0,0.5); color:#fff; padding:2px 6px;border-radius:6px;font-size:12px; }
+  .board-size-input { width:50px; padding:4px; border-radius:4px; border:1px solid #c8d3e6; }
+</style>
+</head>
+<body>
+  <div id="left">
+    <div class="controls">
+      <label class="btn">
+        上傳積木（可多選）
+        <input id="upload" type="file" multiple accept="image/*" hidden>
+      </label>
+      <button id="editFaces" class="btn small">編輯面</button>
+      <input id="faceFiles" type="file" accept="image/*" multiple hidden>
+      <div>行：<input id="rowsInput" type="number" class="board-size-input" value="4" min="1"></div>
+      <div>列：<input id="colsInput" type="number" class="board-size-input" value="8" min="1"></div>
+      <button id="resizeBoard" class="btn small">更新棋盤大小</button>
+    </div>
+    <div id="sidebar">暫置區（拖到盤上）</div>
+    <div class="meta">說明：盤上積木可按 1-4 切換面、按 R 旋轉</div>
+  </div>
+
+  <div id="board-wrap">
+    <div id="board"></div>
+  </div>
+
+<script>
+let COLS=8, ROWS=4, LIMIT=10;
+let boardGrid = [];
+const board=document.getElementById('board');
+const sidebar=document.getElementById('sidebar');
+const upload=document.getElementById('upload');
+const editFacesBtn=document.getElementById('editFaces');
+const faceFilesInput=document.getElementById('faceFiles');
+const rowsInput=document.getElementById('rowsInput');
+const colsInput=document.getElementById('colsInput');
+const resizeBoardBtn=document.getElementById('resizeBoard');
+let selectedPiece=null, dragging=false, dragFromSidebar=false;
+let offsetX=0, offsetY=0;
+
+function initBoardGrid(){
+  boardGrid = Array.from({length:ROWS},()=>Array(COLS).fill(null));
+}
+initBoardGrid();
+
+function updateBoardSize(){
+  ROWS=parseInt(rowsInput.value)||4;
+  COLS=parseInt(colsInput.value)||8;
+  board.style.width=`calc(var(--cell-cm) * ${COLS})`;
+  board.style.height=`calc(var(--cell-cm) * ${ROWS})`;
+  board.style.backgroundSize=`calc(var(--cell-cm)) calc(var(--cell-cm))`;
+  initBoardGrid();
+  board.querySelectorAll('.piece').forEach(p=>snapToGrid(p));
+}
+resizeBoardBtn.addEventListener('click',updateBoardSize);
+
+function makeSidebarThumb(src,w,h){
+  const wrap=document.createElement('div');
+  wrap.className='piece-sidebar';
+  wrap.style.width=w+'px'; wrap.style.height=h+'px';
+  const img=document.createElement('img'); img.src=src;
+  wrap.appendChild(img);
+  wrap.dataset.faces=JSON.stringify([src]);
+  wrap.dataset.faceIndex='0'; wrap.dataset.w=w; wrap.dataset.h=h; wrap.dataset.rotation='0';
+  wrap.addEventListener('mousedown',e=>{selectedPiece=wrap; dragFromSidebar=true; offsetX=e.offsetX; offsetY=e.offsetY;});
+  return wrap;
+}
+
+upload.addEventListener('change',e=>{
+  const files=Array.from(e.target.files).slice(0,LIMIT);
+  files.forEach(file=>{
+    const url=URL.createObjectURL(file);
+    const img=new Image(); img.src=url;
+    img.onload=()=>{sidebar.appendChild(makeSidebarThumb(url,img.naturalWidth,img.naturalHeight));};
+  });
+  upload.value='';
+});
+
+function createBoardPiece(facesArray,w,h,initCol=0,initRow=0){
+  const el=document.createElement('div'); el.className='piece';
+  el.style.width=w+'px'; el.style.height=h+'px';
+  el.dataset.w=w; el.dataset.h=h; el.dataset.rotation='0';
+  el.dataset.faces=JSON.stringify(facesArray); el.dataset.faceIndex='0';
+  const img=document.createElement('img'); img.src=facesArray[0]; el.appendChild(img);
+  const indicator=document.createElement('div'); indicator.className='face-indicator'; indicator.textContent='1/4'; el.appendChild(indicator);
+  board.appendChild(el);
+  snapToGrid(el,initCol,initRow);
+  el.addEventListener('mousedown',e=>{
+    e.stopPropagation(); selectedPiece=el; el.style.zIndex=999;
+    const rect=el.getBoundingClientRect();
+    offsetX=e.clientX-rect.left; offsetY=e.clientY-rect.top; dragging=true; dragFromSidebar=false;
+  });
+  el.addEventListener('contextmenu',e=>{e.preventDefault(); rotatePiece(el,90);});
+  return el;
+}
+
+window.addEventListener('mousemove',e=>{
+  if(!selectedPiece) return;
+  if(dragFromSidebar && selectedPiece.classList.contains('piece-sidebar')){
+    const faces=JSON.parse(selectedPiece.dataset.faces||'[]');
+    const w=parseInt(selectedPiece.dataset.w), h=parseInt(selectedPiece.dataset.h);
+    selectedPiece=createBoardPiece(faces,w,h);
+    dragFromSidebar=false; dragging=true;
+  }
+  if(dragging && selectedPiece && selectedPiece.classList.contains('piece')){
+    const br=board.getBoundingClientRect();
+    selectedPiece.style.left=(e.clientX-br.left-offsetX)+'px';
+    selectedPiece.style.top=(e.clientY-br.top-offsetY)+'px';
+  }
+});
+
+window.addEventListener('mouseup',e=>{
+  if(!selectedPiece) return;
+  if(dragging && selectedPiece.classList.contains('piece')) snapToGrid(selectedPiece);
+  dragging=false; dragFromSidebar=false;
+  if(selectedPiece && selectedPiece.classList.contains('piece')) selectedPiece.style.zIndex='';
+});
+
+function snapToGrid(piece,col=null,row=null){
+  const cellW=board.clientWidth/COLS, cellH=board.clientHeight/ROWS;
+  if(col==null || row==null){
+    let x=parseFloat(piece.style.left)||0, y=parseFloat(piece.style.top)||0;
+    col=Math.round(x/cellW); row=Math.round(y/cellH);
+  }
+  col=Math.max(0, Math.min(COLS-1, col)); row=Math.max(0, Math.min(ROWS-1, row));
+  if(canPlace(piece,col,row)){
+    piece.style.left=(col*cellW)+'px'; piece.style.top=(row*cellH)+'px';
+    occupyGrid(piece,col,row);
+  }
+  updateFaceIndicator(piece);
+}
+
+function occupyGrid(piece,col,row){
+  const rotation=parseInt(piece.dataset.rotation||'0');
+  const w=parseInt(piece.dataset.w), h=parseInt(piece.dataset.h);
+  const isRotated=rotation%180!==0;
+  const pieceCols=Math.round((isRotated?h:w)/ (board.clientWidth/COLS));
+  const pieceRows=Math.round((isRotated?w:h)/ (board.clientHeight/ROWS));
+  for(let r=0;r<pieceRows;r++) for(let c=0;c<pieceCols;c++) boardGrid[row+r][col+c]=piece;
+}
+
+function canPlace(piece,col,row){
+  const rotation=parseInt(piece.dataset.rotation||'0');
+  const w=parseInt(piece.dataset.w), h=parseInt(piece.dataset.h);
+  const isRotated=rotation%180!==0;
+  const pieceCols=Math.round((isRotated?h:w)/ (board.clientWidth/COLS));
+  const pieceRows=Math.round((isRotated?w:h)/ (board.clientHeight/ROWS));
+  if(col+pieceCols>COLS || row+pieceRows>ROWS) return false;
+  for(let r=0;r<pieceRows;r++) for(let c=0;c<pieceCols;c++){
+    if(boardGrid[row+r][col+c] && boardGrid[row+r][col+c]!==piece) return false;
+  }
+  return true;
+}
+
+function rotatePiece(piece,angle=90){
+  piece.dataset.rotation=(parseInt(piece.dataset.rotation||'0')+angle)%360;
+  piece.style.transform=`rotate(${piece.dataset.rotation}deg)`;
+  snapToGrid(piece);
+}
+
+function showFace(piece,idx){const faces=JSON.parse(piece.dataset.faces||'[]'); if(!faces||faces.length===0) return; const i=Math.min(Math.max(idx,0),faces.length-1); piece.querySelector('img').src=faces[i]; piece.dataset.faceIndex=i; updateFaceIndicator(piece);}
+function updateFaceIndicator(piece){const faces=JSON.parse(piece.dataset.faces||'[]'); const idx=parseInt(piece.dataset.faceIndex||'0'); const indicator=piece.querySelector('.face-indicator'); if(indicator) indicator.textContent=`${idx+1}/${Math.max(4,faces.length)}`;}
+
+editFacesBtn.addEventListener('click',()=>{if(!selectedPiece || !selectedPiece.classList.contains('piece')){alert('請先選擇盤上積木');return;} faceFilesInput.click();});
+faceFilesInput.addEventListener('change',e=>{
+  if(!selectedPiece||!selectedPiece.classList.contains('piece')) return;
+  const files=Array.from(faceFilesInput.files).slice(0,4);
+  if(files.length===0) return;
+  const urls=files.map(f=>URL.createObjectURL(f));
+  selectedPiece.dataset.faces=JSON.stringify(urls); selectedPiece.dataset.faceIndex='0'; showFace(selectedPiece,0); faceFilesInput.value='';
+});
+
+window.addEventListener('keydown',e=>{if(!selectedPiece||!selectedPiece.classList.contains('piece')) return; if(['1','2','3','4'].includes(e.key)) showFace(selectedPiece,parseInt(e.key)-1); if(e.key.toLowerCase()==='r') rotatePiece(selectedPiece,90);});
+
+board.addEventListener('mousedown',e=>{if(e.target===board) selectedPiece=null;});
+
+board.innerHTML='<div style="position:absolute;left:8px;top:8px;color:#5b6b83;font-size:13px">將圖片拖到左側暫置區 → 從暫置區拖到盤上。選中盤上積木可按 1-4 切換面、按 R 旋轉。</div>';
+</script>
+</body>
+</html>
