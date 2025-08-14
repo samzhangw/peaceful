@@ -161,11 +161,21 @@ function snapToGrid(piece){
   const cellW=board.clientWidth/COLS, cellH=board.clientHeight/ROWS;
   let x=parseFloat(piece.style.left)||0, y=parseFloat(piece.style.top)||0;
   let col=Math.round(x/cellW); let row=Math.round(y/cellH);
-  col=Math.max(0, Math.min(COLS-1, col)); row=Math.max(0, Math.min(ROWS-1, row));
   piece.style.left=(col*cellW)+'px'; piece.style.top=(row*cellH)+'px';
 }
 
-function rotatePiece(piece,angle=90){ piece.dataset.rotation=(parseInt(piece.dataset.rotation||'0')+angle)%360; piece.style.transform=`rotate(${piece.dataset.rotation}deg)`; snapToGrid(piece); }
+function rotatePiece(piece,angle=90){
+  const current=parseInt(piece.dataset.rotation||'0');
+  const next=(current+angle)%360; piece.dataset.rotation=String(next);
+  piece.style.transformOrigin='top left';
+  const before=piece.getBoundingClientRect();
+  piece.style.transform=`rotate(${next}deg)`;
+  const after=piece.getBoundingClientRect();
+  const dx=after.left-before.left; const dy=after.top-before.top;
+  const left=parseFloat(piece.style.left)||0; const top=parseFloat(piece.style.top)||0;
+  piece.style.left=(left-dx)+'px'; piece.style.top=(top-dy)+'px';
+  snapToGrid(piece);
+}
 
 exportPNGBtn.addEventListener('click',()=>{
   html2canvas(board).then(canvas=>{
