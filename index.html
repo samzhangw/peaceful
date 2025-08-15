@@ -30,6 +30,32 @@
   .usage-indicator { position:absolute; bottom:2px; right:2px; background:rgba(255,0,0,0.8); color:#fff; padding:1px 4px; border-radius:3px; font-size:9px; font-weight:bold; }
   .board-size-input { width:50px; padding:4px; border-radius:4px; border:1px solid #c8d3e6; }
   
+  /* 刪除按鈕樣式 */
+  .delete-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 16px;
+    height: 16px;
+    background: rgba(255,0,0,0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: bold;
+    display: none;
+    z-index: 10;
+  }
+  
+  .delete-btn:hover {
+    background: rgba(255,0,0,1);
+  }
+  
+  .piece-sidebar:hover .delete-btn {
+    display: block;
+  }
+  
   /* 說明彈窗樣式 */
   .help-btn {
     position: fixed;
@@ -164,7 +190,7 @@
         <li><strong>移動積木</strong>：在棋盤上拖曳積木可移動位置</li>
         <li><strong>旋轉積木</strong>：雙擊積木可旋轉90度</li>
         <li><strong>切換積木面</strong>：點擊積木可切換到下一面（每個積木有4個面）</li>
-        <li><strong>移除積木</strong>：右鍵點擊積木可從棋盤上移除</li>
+        <li><strong>移除積木</strong>：右鍵點擊積木可從棋盤上移除，或將滑鼠移到積木框上點擊紅色「×」按鈕</li>
       </ul>
 
       <h3>棋盤設定</h3>
@@ -316,6 +342,21 @@ function createSidebar(pieceIndex){
       usageIndicator.style.fontSize = '9px';
       usageIndicator.style.fontWeight = 'bold';
       faceContainer.appendChild(usageIndicator);
+      
+      // 刪除按鈕
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.title = '刪除盤中積木';
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // 防止觸發拖曳
+        const pieceIndex = parseInt(faceContainer.dataset.pieceIndex);
+        const boardPiece = document.querySelector(`.piece[data-piece-index="${pieceIndex}"]`);
+        if (boardPiece) {
+          removeBoardPiece(boardPiece);
+        }
+      });
+      faceContainer.appendChild(deleteBtn);
       
       // 拖曳事件
       faceContainer.addEventListener('mousedown', ev => {
