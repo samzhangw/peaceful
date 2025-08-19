@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
-<head>
-<meta charset="UTF-8">
-<title>自訂大小棋盤 + 四面積木暫置區（單積木單面盤上，可移除積木、旋轉、匯出PNG）</title>
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>自訂大小棋盤 + 四面積木暫置區（單積木單面盤上，可移除積木、旋轉、匯出PNG）</title>
 <style>
   :root{ --cell-cm:2.5cm; }
   body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Noto Sans TC, sans-serif; display: flex; gap: 20px; padding:16px; }
@@ -13,13 +14,13 @@
   #board-wrap { background: #f6f7fb; padding: 12px; border-radius: 12px; flex:1; }
   #board {
     position: relative;
-    background-image: linear-gradient(to right, #e7ecf5 1px, transparent 1px),
-                      linear-gradient(to bottom, #e7ecf5 1px, transparent 1px);
-    border: 2px solid #d7deea;
+    background-image: linear-gradient(to right, #4a5568 2px, transparent 2px),
+                      linear-gradient(to bottom, #4a5568 2px, transparent 2px);
+    border: 3px solid #2d3748;
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(18,35,62,.06);
   }
-  .piece, .piece-sidebar { position: relative; display:block; cursor: grab; user-select: none; transform-origin: top left; border-radius: 6px; overflow: hidden; }
+  .piece, .piece-sidebar { position: relative; display:block; cursor: grab; user-select: none; transform-origin: top left; border-radius: 6px; overflow: hidden; touch-action: manipulation; }
   .piece { position: absolute; }
   .piece img, .piece-sidebar img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events:none; }
   .controls { margin-bottom:8px; display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
@@ -27,7 +28,99 @@
   .small { padding:6px 8px; font-size:13px; }
   .meta { font-size:12px; color:#5b6b83; margin-top:8px; }
   .face-indicator { position:absolute; right:6px; top:6px; background:rgba(0,0,0,0.5); color:#fff; padding:2px 6px;border-radius:6px;font-size:12px; }
+  .usage-indicator { position:absolute; bottom:2px; right:2px; background:rgba(255,0,0,0.8); color:#fff; padding:1px 4px; border-radius:3px; font-size:9px; font-weight:bold; }
   .board-size-input { width:50px; padding:4px; border-radius:4px; border:1px solid #c8d3e6; }
+  
+  /* 手機版樣式 */
+  @media (max-width: 768px) {
+    body {
+      flex-direction: column;
+      gap: 12px;
+      padding: 8px;
+    }
+    
+    #left {
+      width: 100%;
+      order: 2;
+    }
+    
+    #board-wrap {
+      order: 1;
+      padding: 8px;
+    }
+    
+    .controls {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+    }
+    
+    .controls > div {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .btn {
+      padding: 12px 16px;
+      font-size: 16px;
+      min-height: 44px;
+    }
+    
+    .small {
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    
+    .board-size-input {
+      width: 60px;
+      padding: 8px;
+      font-size: 16px;
+      min-height: 44px;
+    }
+    
+    .sidebar {
+      padding: 12px;
+      min-height: 100px;
+      gap: 10px;
+    }
+    
+    .piece-sidebar {
+      min-width: 60px;
+      min-height: 60px;
+    }
+    
+    .meta {
+      font-size: 14px;
+      line-height: 1.4;
+    }
+  }
+  
+  /* 超小螢幕適配 */
+  @media (max-width: 480px) {
+    :root {
+      --cell-cm: 2cm;
+    }
+    
+    .controls {
+      gap: 4px;
+    }
+    
+    .btn {
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    
+    .sidebar {
+      padding: 8px;
+      gap: 8px;
+    }
+    
+    .piece-sidebar {
+      min-width: 50px;
+      min-height: 50px;
+    }
+  }
   
   /* 列印樣式：只印出棋盤 */
   @media print {
@@ -35,7 +128,13 @@
     body { display:block; padding:0; }
     #left, .controls, .meta, .sidebar-container { display:none !important; }
     #board-wrap { padding:0 !important; background:#fff !important; }
-    #board { box-shadow:none !important; border-color:#c8d3e6; }
+    #board { 
+      box-shadow:none !important; 
+      border-color:#2d3748 !important;
+      border-width:3px !important;
+      background-image: linear-gradient(to right, #4a5568 2px, transparent 2px),
+                        linear-gradient(to bottom, #4a5568 2px, transparent 2px) !important;
+    }
     .face-indicator { display:none !important; }
   }
 </style>
@@ -52,7 +151,7 @@
     </div>
 
     <div id="sidebars"></div>
-    <div class="meta">說明：盤上積木可旋轉（雙擊旋轉），每個積木同時僅能有一個面在盤上，可右鍵移除積木，匯出 PNG。</div>
+    <div class="meta">說明：盤上積木可旋轉（雙擊旋轉），每個積木有4個面，點擊積木可切換面，每個積木同時僅能有一個面在盤上，可右鍵移除積木，匯出 PNG。紅色標籤表示積木未使用，綠色標籤表示積木已使用。</div>
   </div>
 
   <div id="board-wrap">
@@ -88,28 +187,150 @@ function createSidebar(pieceIndex){
   const title=document.createElement('div'); title.className='sidebar-title'; title.textContent=`積木 ${pieceIndex+1}`; container.appendChild(title);
   const sidebar=document.createElement('div'); sidebar.className='sidebar'; container.appendChild(sidebar);
 
+  // 預設圖片路徑 - 4個面
+  const defaultImagePaths = [
+    `images/積木${pieceIndex+1}/方塊測試 (${pieceIndex+1}).png`,
+    `images/積木${pieceIndex+1}/方塊測試 (${pieceIndex+1})_2.png`,
+    `images/積木${pieceIndex+1}/方塊測試 (${pieceIndex+1})_3.png`,
+    `images/積木${pieceIndex+1}/方塊測試 (${pieceIndex+1})_4.png`
+  ];
+  
+  // 建立4個面的縮圖容器
+  const createFaceThumbnails = (faces, isColorMode = false) => {
+    sidebar.innerHTML = '';
+    
+    faces.forEach((face, index) => {
+      const faceContainer = document.createElement('div');
+      faceContainer.className = 'piece-sidebar';
+      faceContainer.style.position = 'relative';
+      faceContainer.style.margin = '2px';
+      faceContainer.style.cursor = 'pointer';
+      faceContainer.dataset.faceIndex = String(index);
+      faceContainer.dataset.pieceIndex = pieceIndex;
+      faceContainer.dataset.faceUrl = face;
+      
+      if (isColorMode) {
+        // 彩色方塊模式
+        const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#a55eea', '#fd79a8', '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24'];
+        const sizes = [30, 30, 30, 30, 30, 30, 60, 60, 60, 60];
+        const heights = [30, 30, 30, 30, 30, 30, 15, 15, 15, 15];
+        
+        faceContainer.style.width = sizes[pieceIndex] + 'px';
+        faceContainer.style.height = heights[pieceIndex] + 'px';
+        faceContainer.style.backgroundColor = face;
+        faceContainer.style.border = '1px solid #333';
+        faceContainer.dataset.w = sizes[pieceIndex];
+        faceContainer.dataset.h = heights[pieceIndex];
+      } else {
+        // 圖片模式
+        const img = new Image();
+        img.src = face;
+        img.onload = () => {
+          faceContainer.style.width = (img.naturalWidth / 2) + 'px'; // 縮小顯示
+          faceContainer.style.height = (img.naturalHeight / 2) + 'px';
+          faceContainer.dataset.w = img.naturalWidth;
+          faceContainer.dataset.h = img.naturalHeight;
+          faceContainer.appendChild(img);
+        };
+        img.onerror = () => {
+          // 如果圖片載入失敗，使用彩色方塊
+          const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#a55eea', '#fd79a8', '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24'];
+          const sizes = [30, 30, 30, 30, 30, 30, 60, 60, 60, 60];
+          const heights = [30, 30, 30, 30, 30, 30, 15, 15, 15, 15];
+          
+          faceContainer.style.width = sizes[pieceIndex] + 'px';
+          faceContainer.style.height = heights[pieceIndex] + 'px';
+          faceContainer.style.backgroundColor = colors[pieceIndex];
+          faceContainer.style.border = '1px solid #333';
+          faceContainer.dataset.w = sizes[pieceIndex];
+          faceContainer.dataset.h = heights[pieceIndex];
+        };
+      }
+      
+      // 面數標籤
+          // 面數標籤
+      const faceLabel = document.createElement('div');
+      faceLabel.textContent = `${index + 1}`;
+      faceLabel.style.position = 'absolute';
+      faceLabel.style.top = '2px';
+      faceLabel.style.left = '2px';
+      faceLabel.style.background = 'rgba(0,0,0,0.7)';
+      faceLabel.style.color = '#fff';
+      faceLabel.style.padding = '1px 4px';
+      faceLabel.style.borderRadius = '3px';
+      faceLabel.style.fontSize = '10px';
+      faceLabel.style.fontWeight = 'bold';
+      faceContainer.appendChild(faceLabel);
+      
+      // 使用狀態指示器
+      const usageIndicator = document.createElement('div');
+      usageIndicator.className = 'usage-indicator';
+      usageIndicator.textContent = '未使用';
+      usageIndicator.style.position = 'absolute';
+      usageIndicator.style.bottom = '2px';
+      usageIndicator.style.right = '2px';
+      usageIndicator.style.background = 'rgba(255,0,0,0.8)';
+      usageIndicator.style.color = '#fff';
+      usageIndicator.style.padding = '1px 4px';
+      usageIndicator.style.borderRadius = '3px';
+      usageIndicator.style.fontSize = '9px';
+      usageIndicator.style.fontWeight = 'bold';
+      faceContainer.appendChild(usageIndicator);
+      
+      // 拖曳事件
+      faceContainer.addEventListener('mousedown', ev => {
+        if(activePiecesOnBoard.get(pieceIndex)) return;
+        selectedPiece = faceContainer;
+        dragFromSidebar = true;
+        offsetX = ev.offsetX;
+        offsetY = ev.offsetY;
+      });
+      
+      // 觸控拖曳事件
+      faceContainer.addEventListener('touchstart', ev => {
+        ev.preventDefault();
+        if(activePiecesOnBoard.get(pieceIndex)) return;
+        selectedPiece = faceContainer;
+        dragFromSidebar = true;
+        const touch = ev.touches[0];
+        const rect = faceContainer.getBoundingClientRect();
+        offsetX = touch.clientX - rect.left;
+        offsetY = touch.clientY - rect.top;
+      });
+      
+      sidebar.appendChild(faceContainer);
+    });
+  };
+  
+  // 嘗試載入預設圖片
+  const testImg = new Image();
+  testImg.src = defaultImagePaths[0];
+  testImg.onload = () => {
+    // 圖片載入成功，建立4個面的縮圖
+    createFaceThumbnails(defaultImagePaths);
+  };
+  
+  testImg.onerror = () => {
+    // 圖片載入失敗，建立彩色方塊的4個面
+    const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#a55eea', '#fd79a8', '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24'];
+    const faceColors = [
+      colors[pieceIndex],
+      colors[(pieceIndex + 1) % colors.length],
+      colors[(pieceIndex + 2) % colors.length],
+      colors[(pieceIndex + 3) % colors.length]
+    ];
+    createFaceThumbnails(faceColors, true);
+  };
+
   const fileInput=document.createElement('input');
   fileInput.type='file'; fileInput.accept='image/*'; fileInput.multiple=true; fileInput.hidden=true;
   fileInput.addEventListener('change',e=>{
     const files=Array.from(fileInput.files).slice(0,4);
-    sidebar.innerHTML='';
-    files.forEach(f=>{
-      const url=URL.createObjectURL(f);
-      const img=new Image(); img.src=url;
-      img.onload=()=>{ 
-        const thumb=document.createElement('div'); thumb.className='piece-sidebar';
-        thumb.style.width=img.naturalWidth+'px'; thumb.style.height=img.naturalHeight+'px';
-        thumb.dataset.faces=JSON.stringify([url]); thumb.dataset.faceIndex='0'; thumb.dataset.w=img.naturalWidth; thumb.dataset.h=img.naturalHeight; thumb.dataset.rotation='0';
-        thumb.dataset.pieceIndex = pieceIndex;
-        thumb.dataset.faceUrl = url;
-        thumb.appendChild(img);
-        thumb.addEventListener('mousedown',ev=>{
-          if(activePiecesOnBoard.get(pieceIndex)) return;
-          selectedPiece=thumb; dragFromSidebar=true; offsetX=ev.offsetX; offsetY=ev.offsetY;
-        });
-        sidebar.appendChild(thumb);
-      };
-    });
+    const faceUrls = [];
+    for(let i = 0; i < 4; i++) {
+      faceUrls.push(i < files.length ? URL.createObjectURL(files[i]) : URL.createObjectURL(files[0]));
+    }
+    createFaceThumbnails(faceUrls);
   });
 
   const uploadBtn=document.createElement('button'); uploadBtn.textContent='上傳'; uploadBtn.className='btn small';
@@ -122,13 +343,25 @@ for(let i=0;i<PIECES;i++) createSidebar(i);
 function createBoardPiece(facesArray,w,h,initCol=0,initRow=0,pieceIndex=0,faceUrl=''){
   if(activePiecesOnBoard.get(pieceIndex)) return null;
   activePiecesOnBoard.set(pieceIndex, true);
+  
+  // 更新側邊欄的使用狀態
+  updateUsageStatus(pieceIndex, true);
+  
   const el=document.createElement('div'); el.className='piece';
   el.style.width=w+'px'; el.style.height=h+'px';
   el.dataset.w=w; el.dataset.h=h; el.dataset.rotation='0';
-  el.dataset.faces=JSON.stringify(facesArray); el.dataset.faceIndex='0';
-  el.dataset.faceUrl = faceUrl; el.dataset.pieceIndex = pieceIndex;
+  
+  // 如果 facesArray 是單一值，建立4個面的陣列
+  if (typeof facesArray === 'string') {
+    facesArray = [facesArray, facesArray, facesArray, facesArray];
+  }
+  
+  el.dataset.faces=JSON.stringify(facesArray); 
+  el.dataset.faceIndex='0';
+  el.dataset.faceUrl = faceUrl; 
+  el.dataset.pieceIndex = pieceIndex;
   const img=document.createElement('img'); img.src=facesArray[0]; el.appendChild(img);
-  const indicator=document.createElement('div'); indicator.className='face-indicator'; indicator.textContent='1/1'; el.appendChild(indicator);
+  const indicator=document.createElement('div'); indicator.className='face-indicator'; indicator.textContent='1/'+facesArray.length; el.appendChild(indicator);
   board.appendChild(el); snapToGrid(el,initCol,initRow);
 
   el.addEventListener('mousedown',e=>{
@@ -137,34 +370,107 @@ function createBoardPiece(facesArray,w,h,initCol=0,initRow=0,pieceIndex=0,faceUr
     offsetX=e.clientX-rect.left; offsetY=e.clientY-rect.top; dragging=true; dragFromSidebar=false;
   });
 
+  // 觸控事件
+  el.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    e.stopPropagation(); 
+    selectedPiece=el; 
+    el.style.zIndex=999;
+    const rect=el.getBoundingClientRect();
+    const touch = e.touches[0];
+    offsetX=touch.clientX-rect.left; 
+    offsetY=touch.clientY-rect.top; 
+    dragging=true; 
+    dragFromSidebar=false;
+  });
+
   el.addEventListener('dblclick',()=>rotatePiece(el,90));
   el.addEventListener('contextmenu',e=>{ e.preventDefault(); removeBoardPiece(el); });
+  
+  // 點擊切換面
+  el.addEventListener('click', ev => {
+    if(ev.target === indicator) return; // 避免點擊指示器時切換
+    const currentFaceIndex = parseInt(el.dataset.faceIndex || '0');
+    const nextFaceIndex = (currentFaceIndex + 1) % facesArray.length;
+    el.dataset.faceIndex = String(nextFaceIndex);
+    el.dataset.faceUrl = facesArray[nextFaceIndex];
+    el.querySelector('img').src = facesArray[nextFaceIndex];
+    indicator.textContent = `${nextFaceIndex + 1}/${facesArray.length}`;
+  });
+  
+  // 觸控長按旋轉
+  let longPressTimer;
+  el.addEventListener('touchstart', ev => {
+    longPressTimer = setTimeout(() => {
+      rotatePiece(el, 90);
+    }, 500);
+  });
+  
+  el.addEventListener('touchend', ev => {
+    clearTimeout(longPressTimer);
+  });
+  
+  el.addEventListener('touchmove', ev => {
+    clearTimeout(longPressTimer);
+  });
+  
   return el;
 }
 
 function removeBoardPiece(piece){
   const pieceIndex = parseInt(piece.dataset.pieceIndex);
   activePiecesOnBoard.delete(pieceIndex);
+  
+  // 更新側邊欄的使用狀態
+  updateUsageStatus(pieceIndex, false);
+  
   piece.remove();
 }
 
 window.addEventListener('mousemove',e=>{
   if(!selectedPiece) return;
   if(dragFromSidebar && selectedPiece.classList.contains('piece-sidebar')){
-    const faces=JSON.parse(selectedPiece.dataset.faces||'[]');
-    const w=parseInt(selectedPiece.dataset.w), h=parseInt(selectedPiece.dataset.h);
+    const faceUrl = selectedPiece.dataset.faceUrl;
+    const w = parseInt(selectedPiece.dataset.w), h = parseInt(selectedPiece.dataset.h);
     const pieceIndex = parseInt(selectedPiece.dataset.pieceIndex);
-    selectedPiece=createBoardPiece(faces,w,h,0,0,pieceIndex,selectedPiece.dataset.faceUrl);
-    dragFromSidebar=false; dragging=true;
+    selectedPiece = createBoardPiece(faceUrl, w, h, 0, 0, pieceIndex, faceUrl);
+    dragFromSidebar = false; dragging = true;
   }
   if(dragging && selectedPiece && selectedPiece.classList.contains('piece')){
-    const br=board.getBoundingClientRect();
-    selectedPiece.style.left=(e.clientX-br.left-offsetX)+'px';
-    selectedPiece.style.top=(e.clientY-br.top-offsetY)+'px';
+    const br = board.getBoundingClientRect();
+    selectedPiece.style.left = (e.clientX - br.left - offsetX) + 'px';
+    selectedPiece.style.top = (e.clientY - br.top - offsetY) + 'px';
+  }
+});
+
+// 觸控移動事件
+window.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(!selectedPiece) return;
+  if(dragFromSidebar && selectedPiece.classList.contains('piece-sidebar')){
+    const faceUrl = selectedPiece.dataset.faceUrl;
+    const w = parseInt(selectedPiece.dataset.w), h = parseInt(selectedPiece.dataset.h);
+    const pieceIndex = parseInt(selectedPiece.dataset.pieceIndex);
+    selectedPiece = createBoardPiece(faceUrl, w, h, 0, 0, pieceIndex, faceUrl);
+    dragFromSidebar = false; dragging = true;
+  }
+  if(dragging && selectedPiece && selectedPiece.classList.contains('piece')){
+    const br = board.getBoundingClientRect();
+    const touch = e.touches[0];
+    selectedPiece.style.left = (touch.clientX - br.left - offsetX) + 'px';
+    selectedPiece.style.top = (touch.clientY - br.top - offsetY) + 'px';
   }
 });
 
 window.addEventListener('mouseup',e=>{
+  if(!selectedPiece) return;
+  if(dragging && selectedPiece.classList.contains('piece')) snapToGrid(selectedPiece);
+  dragging=false; dragFromSidebar=false;
+  if(selectedPiece && selectedPiece.classList.contains('piece')) selectedPiece.style.zIndex='';
+});
+
+// 觸控結束事件
+window.addEventListener('touchend',e=>{
   if(!selectedPiece) return;
   if(dragging && selectedPiece.classList.contains('piece')) snapToGrid(selectedPiece);
   dragging=false; dragFromSidebar=false;
@@ -204,6 +510,22 @@ function applyTransformWithAnchor(piece){
   snapToGrid(piece);
 }
 
+// 更新積木使用狀態的函數
+function updateUsageStatus(pieceIndex, isUsed) {
+  const sidebar = document.querySelector(`[data-piece-index="${pieceIndex}"]`).closest('.sidebar');
+  const usageIndicators = sidebar.querySelectorAll('.usage-indicator');
+  
+  usageIndicators.forEach(indicator => {
+    if (isUsed) {
+      indicator.textContent = '使用中';
+      indicator.style.background = 'rgba(0,255,0,0.8)';
+    } else {
+      indicator.textContent = '未使用';
+      indicator.style.background = 'rgba(255,0,0,0.8)';
+    }
+  });
+}
+
 printBtn.addEventListener('click',()=>{ window.print(); });
 
 flipHBtn.addEventListener('click',()=>{
@@ -218,9 +540,22 @@ flipVBtn.addEventListener('click',()=>{
   applyTransformWithAnchor(selectedPiece);
 });
 
+// 防止手機版縮放
+document.addEventListener('gesturestart', function(e) {
+  e.preventDefault();
+});
+
+document.addEventListener('gesturechange', function(e) {
+  e.preventDefault();
+});
+
+document.addEventListener('gestureend', function(e) {
+  e.preventDefault();
+});
+
 // 列印不需外部函式庫
 
-board.innerHTML='<div style="position:absolute;left:8px;top:8px;color:#5b6b83;font-size:13px">從每個積木暫置區拖到盤上，每個積木同時僅能有一個面在盤上，雙擊旋轉，右鍵移除積木，按下「列印」可直接列印棋盤。</div>';
+board.innerHTML='<div style="position:absolute;left:8px;top:8px;color:#5b6b83;font-size:13px">從每個積木暫置區拖到盤上，每個積木有4個面，點擊積木可切換面，雙擊旋轉，右鍵移除積木，按下「列印」可直接列印棋盤。</div>';
 </script>
 </body>
 </html>
